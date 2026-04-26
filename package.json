@@ -15,9 +15,12 @@
     "jest": "latest"
   },
   "dependencies": {
+    "argon2": "latest",
     "better-sqlite3": "^11.10.0",
     "disposable-email-domains": "^1.0.0",
+    "dotenv": "latest",
     "express": "^4.18.2",
+    "jsonwebtoken": "latest",
     "zxcvbn": "^4.4.2"
   }
 }

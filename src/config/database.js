@@ -26,6 +26,18 @@ const USERS_DDL = `
   ) STRICT;
 `;
 
+const REFRESH_TOKENS_DDL = `
+  CREATE TABLE refresh_tokens (
+    rft_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rft_user_uuid TEXT NOT NULL,
+    rft_token_hash TEXT NOT NULL UNIQUE,
+    rft_expires_at TEXT NOT NULL,
+    rft_created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    rft_revoked_at TEXT,
+    FOREIGN KEY (rft_user_uuid) REFERENCES users(usr_uuid) ON DELETE CASCADE
+  ) STRICT;
+`;
+
 function hasLegacyUsersTable(instance) {
   const row = instance
     .prepare(
@@ -102,6 +114,17 @@ function ensureUsersSchema(instance) {
   }
 }
 
+function ensureRefreshTokenSchema(instance) {
+  const tableRow = instance
+    .prepare(
+      "SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'refresh_tokens'"
+    )
+    .get();
+  if (!tableRow) {
+    instance.exec(REFRESH_TOKENS_DDL);
+  }
+}
+
 function initDatabase() {
   if (db) return db;
 
@@ -110,7 +133,9 @@ function initDatabase() {
 
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
   ensureUsersSchema(db);
+  ensureRefreshTokenSchema(db);
 
   return db;
 }

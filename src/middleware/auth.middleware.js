@@ -1,15 +1,13 @@
 const authService = require('../services/auth.service');
 
 function authMiddleware(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Missing bearer token' });
+  const token = authService.getAccessTokenFromRequest(req);
+  if (!token) {
+    return res.status(401).json({ message: 'missing access token cookie' });
   }
-
-  const token = authHeader.replace('Bearer ', '').trim();
-  const payload = authService.verifyToken(token);
+  const payload = authService.verifyAccessToken(token);
   if (!payload || !payload.sub) {
-    return res.status(401).json({ message: 'Invalid or expired token' });
+    return res.status(401).json({ message: 'invalid or expired access token' });
   }
 
   req.auth = {

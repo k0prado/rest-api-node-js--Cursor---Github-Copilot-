@@ -1,7 +1,9 @@
 jest.mock('../src/services/auth.service', () => ({
   sanitizeLoginInput: jest.fn(),
   validateLoginData: jest.fn(),
-  verifyPassword: jest.fn()
+  verifyPassword: jest.fn(),
+  generateTokens: jest.fn(),
+  setAuthCookies: jest.fn()
 }));
 
 jest.mock('../src/models/user.model', () => ({
@@ -24,7 +26,7 @@ describe('auth.controller login', () => {
     jest.clearAllMocks();
   });
 
-  it('returns 200 when user exists and password is valid', () => {
+  it('returns 200 when user exists and password is valid', async () => {
     const req = { body: { email: 'test@example.com', password: 'Strong!Pass123' } };
     const res = buildRes();
 
@@ -38,15 +40,23 @@ describe('auth.controller login', () => {
       email: 'test@example.com',
       passwordHash: 'scrypt$abc$def'
     });
-    authService.verifyPassword.mockReturnValue(true);
+    authService.verifyPassword.mockResolvedValue(true);
+    authService.generateTokens.mockResolvedValue({
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token'
+    });
 
-    login(req, res);
+    await login(req, res);
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ message: 'login successful' });
+    expect(authService.setAuthCookies).toHaveBeenCalledWith(res, {
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token'
+    });
+    expect(res.json).toHaveBeenCalledWith({ authenticated: true });
   });
 
-  it('returns 404 when user does not exist', () => {
+  it('returns 404 when user does not exist', async () => {
     const req = { body: { email: 'missing@example.com', password: 'Strong!Pass123' } };
     const res = buildRes();
 
@@ -57,14 +67,14 @@ describe('auth.controller login', () => {
     authService.validateLoginData.mockReturnValue(undefined);
     UserModel.findByEmail.mockReturnValue(null);
 
-    login(req, res);
+    await login(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({ message: 'user not found for provided email' });
     expect(authService.verifyPassword).not.toHaveBeenCalled();
   });
 
-  it('returns 401 when password is invalid', () => {
+  it('returns 401 when password is invalid', async () => {
     const req = { body: { email: 'test@example.com', password: 'Wrong!Pass123' } };
     const res = buildRes();
 
@@ -78,15 +88,15 @@ describe('auth.controller login', () => {
       email: 'test@example.com',
       passwordHash: 'scrypt$abc$def'
     });
-    authService.verifyPassword.mockReturnValue(false);
+    authService.verifyPassword.mockResolvedValue(false);
 
-    login(req, res);
+    await login(req, res);
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({ message: 'invalid email or password' });
   });
 
-  it('returns service statusCode when validation throws', () => {
+  it('returns service statusCode when validation throws', async () => {
     const req = { body: { email: 'invalid-email', password: 'x' } };
     const res = buildRes();
     const error = new Error('invalid email format');
@@ -100,7 +110,7 @@ describe('auth.controller login', () => {
       throw error;
     });
 
-    login(req, res);
+    await login(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ message: 'invalid email format' });
