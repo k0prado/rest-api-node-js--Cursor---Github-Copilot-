@@ -38,6 +38,21 @@ const REFRESH_TOKENS_DDL = `
   ) STRICT;
 `;
 
+const EVENTS_DDL = `
+  CREATE TABLE events (
+    evt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evt_uuid TEXT NOT NULL UNIQUE,
+    evt_user_uuid TEXT NOT NULL,
+    evt_title TEXT NOT NULL,
+    evt_description TEXT NOT NULL,
+    evt_address TEXT NOT NULL,
+    evt_date TEXT NOT NULL,
+    evt_created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    evt_updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (evt_user_uuid) REFERENCES users(usr_uuid) ON DELETE CASCADE
+  ) STRICT;
+`;
+
 function hasLegacyUsersTable(instance) {
   const row = instance
     .prepare(
@@ -125,6 +140,17 @@ function ensureRefreshTokenSchema(instance) {
   }
 }
 
+function ensureEventsSchema(instance) {
+  const tableRow = instance
+    .prepare(
+      "SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'events'"
+    )
+    .get();
+  if (!tableRow) {
+    instance.exec(EVENTS_DDL);
+  }
+}
+
 function initDatabase() {
   if (db) return db;
 
@@ -136,6 +162,7 @@ function initDatabase() {
   db.pragma('foreign_keys = ON');
   ensureUsersSchema(db);
   ensureRefreshTokenSchema(db);
+  ensureEventsSchema(db);
 
   return db;
 }
