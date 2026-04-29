@@ -6,9 +6,9 @@ let db = null;
 
 function resolveDbPath() {
   const configured = process.env.SQLITE_PATH || './data/app.db';
-  return path.isAbsolute(configured)
-    ? configured
-    : path.resolve(process.cwd(), configured);
+  if (path.isAbsolute(configured)) return configured;
+  // Keep DB path stable regardless of where the server command is executed.
+  return path.resolve(__dirname, '..', '..', configured);
 }
 
 const USERS_DDL = `
@@ -176,6 +176,21 @@ function ensureRegistrationsSchema(instance) {
   }
 }
 
+function resetDatabaseData(instance) {
+  instance.exec('BEGIN');
+  try {
+    instance.exec('DELETE FROM registrations;');
+    instance.exec('DELETE FROM refresh_tokens;');
+    instance.exec('DELETE FROM events;');
+    instance.exec('DELETE FROM users;');
+    instance.exec("DELETE FROM sqlite_sequence WHERE name IN ('registrations', 'refresh_tokens', 'events', 'users');");
+    instance.exec('COMMIT');
+  } catch (error) {
+    instance.exec('ROLLBACK');
+    throw error;
+  }
+}
+
 function initDatabase() {
   if (db) return db;
 
@@ -189,6 +204,7 @@ function initDatabase() {
   ensureRefreshTokenSchema(db);
   ensureEventsSchema(db);
   ensureRegistrationsSchema(db);
+  resetDatabaseData(db);
 
   return db;
 }
