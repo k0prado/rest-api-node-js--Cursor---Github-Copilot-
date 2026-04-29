@@ -11,7 +11,7 @@ async function signup(req, res) {
       password: sanitized.password,
       birthdate: sanitized.birthdate
     });
-    const passwordHash = authService.hashSignupPassword(sanitized.password);
+    const passwordHash = await authService.hashSignupPassword(sanitized.password);
     const user = UserModel.create({
       name: normalized.name,
       age: normalized.age,
@@ -25,7 +25,7 @@ async function signup(req, res) {
   }
 }
 
-function login(req, res) {
+async function login(req, res) {
   try {
     const sanitized = authService.sanitizeLoginInput(req.body || {});
     authService.validateLoginData(sanitized);
@@ -35,12 +35,40 @@ function login(req, res) {
       return res.status(404).json({ message: 'user not found for provided email' });
     }
 
-    const passwordOk = authService.verifyPassword(sanitized.password, user.passwordHash);
+    const passwordOk = await authService.verifyPassword(sanitized.password, user.passwordHash);
     if (!passwordOk) {
       return res.status(401).json({ message: 'invalid email or password' });
     }
+    const tokens = await authService.generateTokens({ userId: user.id, email: user.email });
+    authService.setAuthCookies(res, tokens);
+    return res.status(200).json({ authenticated: true });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ message: error.message });
+  }
+}
 
-    return res.status(200).json({ message: 'login successful' });
+async function refresh(req, res) {
+  try {
+    const refreshToken = authService.getRefreshTokenFromRequest(req);
+    if (!refreshToken) {
+      return res.status(401).json({ message: 'missing refresh token' });
+    }
+    const tokens = await authService.rotateRefreshToken(refreshToken);
+    authService.setAuthCookies(res, tokens);
+    return res.status(200).json({ authenticated: true });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ message: error.message });
+  }
+}
+
+function logout(req, res) {
+  try {
+    const refreshToken = authService.getRefreshTokenFromRequest(req);
+    if (refreshToken) {
+      authService.revokeRefreshToken(refreshToken);
+    }
+    authService.clearAuthCookies(res);
+    return res.status(200).json({ message: 'logout successful' });
   } catch (error) {
     return res.status(error.statusCode || 500).json({ message: error.message });
   }
@@ -48,5 +76,7 @@ function login(req, res) {
 
 module.exports = {
   signup,
-  login
+  login,
+  refresh,
+  logout
 };

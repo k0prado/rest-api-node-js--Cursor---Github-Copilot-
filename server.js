@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const { initDatabase, closeDatabase } = require('./src/config/database');
 
 initDatabase();

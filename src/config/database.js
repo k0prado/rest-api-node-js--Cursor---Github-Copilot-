@@ -6,9 +6,9 @@ let db = null;
 
 function resolveDbPath() {
   const configured = process.env.SQLITE_PATH || './data/app.db';
-  return path.isAbsolute(configured)
-    ? configured
-    : path.resolve(process.cwd(), configured);
+  if (path.isAbsolute(configured)) return configured;
+  // Keep DB path stable regardless of where the server command is executed.
+  return path.resolve(__dirname, '..', '..', configured);
 }
 
 const USERS_DDL = `
@@ -23,6 +23,47 @@ const USERS_DDL = `
     usr_email_verified_at TEXT,
     usr_created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     usr_updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  ) STRICT;
+`;
+
+const REFRESH_TOKENS_DDL = `
+  CREATE TABLE refresh_tokens (
+    rft_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rft_user_uuid TEXT NOT NULL,
+    rft_token_hash TEXT NOT NULL UNIQUE,
+    rft_expires_at TEXT NOT NULL,
+    rft_created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    rft_revoked_at TEXT,
+    FOREIGN KEY (rft_user_uuid) REFERENCES users(usr_uuid) ON DELETE CASCADE
+  ) STRICT;
+`;
+
+const EVENTS_DDL = `
+  CREATE TABLE events (
+    evt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evt_uuid TEXT NOT NULL UNIQUE,
+    evt_user_uuid TEXT NOT NULL,
+    evt_title TEXT NOT NULL,
+    evt_description TEXT NOT NULL,
+    evt_address TEXT NOT NULL,
+    evt_date TEXT NOT NULL,
+    evt_created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    evt_updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (evt_user_uuid) REFERENCES users(usr_uuid) ON DELETE CASCADE
+  ) STRICT;
+`;
+
+const REGISTRATIONS_DDL = `
+  CREATE TABLE registrations (
+    rgs_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rgs_user_uuid TEXT NOT NULL,
+    rgs_event_uuid TEXT NOT NULL,
+    rgs_status INTEGER NOT NULL DEFAULT 1 CHECK (rgs_status IN (1, 2)),
+    rgs_created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    rgs_updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (rgs_user_uuid, rgs_event_uuid),
+    FOREIGN KEY (rgs_user_uuid) REFERENCES users(usr_uuid) ON DELETE CASCADE,
+    FOREIGN KEY (rgs_event_uuid) REFERENCES events(evt_uuid) ON DELETE CASCADE
   ) STRICT;
 `;
 
@@ -102,6 +143,54 @@ function ensureUsersSchema(instance) {
   }
 }
 
+function ensureRefreshTokenSchema(instance) {
+  const tableRow = instance
+    .prepare(
+      "SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'refresh_tokens'"
+    )
+    .get();
+  if (!tableRow) {
+    instance.exec(REFRESH_TOKENS_DDL);
+  }
+}
+
+function ensureEventsSchema(instance) {
+  const tableRow = instance
+    .prepare(
+      "SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'events'"
+    )
+    .get();
+  if (!tableRow) {
+    instance.exec(EVENTS_DDL);
+  }
+}
+
+function ensureRegistrationsSchema(instance) {
+  const tableRow = instance
+    .prepare(
+      "SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'registrations'"
+    )
+    .get();
+  if (!tableRow) {
+    instance.exec(REGISTRATIONS_DDL);
+  }
+}
+
+function resetDatabaseData(instance) {
+  instance.exec('BEGIN');
+  try {
+    instance.exec('DELETE FROM registrations;');
+    instance.exec('DELETE FROM refresh_tokens;');
+    instance.exec('DELETE FROM events;');
+    instance.exec('DELETE FROM users;');
+    instance.exec("DELETE FROM sqlite_sequence WHERE name IN ('registrations', 'refresh_tokens', 'events', 'users');");
+    instance.exec('COMMIT');
+  } catch (error) {
+    instance.exec('ROLLBACK');
+    throw error;
+  }
+}
+
 function initDatabase() {
   if (db) return db;
 
@@ -110,7 +199,12 @@ function initDatabase() {
 
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
   ensureUsersSchema(db);
+  ensureRefreshTokenSchema(db);
+  ensureEventsSchema(db);
+  ensureRegistrationsSchema(db);
+  resetDatabaseData(db);
 
   return db;
 }
