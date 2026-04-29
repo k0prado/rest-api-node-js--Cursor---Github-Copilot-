@@ -53,6 +53,20 @@ const EVENTS_DDL = `
   ) STRICT;
 `;
 
+const REGISTRATIONS_DDL = `
+  CREATE TABLE registrations (
+    rgs_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rgs_user_uuid TEXT NOT NULL,
+    rgs_event_uuid TEXT NOT NULL,
+    rgs_status INTEGER NOT NULL DEFAULT 1 CHECK (rgs_status IN (1, 2)),
+    rgs_created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    rgs_updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (rgs_user_uuid, rgs_event_uuid),
+    FOREIGN KEY (rgs_user_uuid) REFERENCES users(usr_uuid) ON DELETE CASCADE,
+    FOREIGN KEY (rgs_event_uuid) REFERENCES events(evt_uuid) ON DELETE CASCADE
+  ) STRICT;
+`;
+
 function hasLegacyUsersTable(instance) {
   const row = instance
     .prepare(
@@ -151,6 +165,17 @@ function ensureEventsSchema(instance) {
   }
 }
 
+function ensureRegistrationsSchema(instance) {
+  const tableRow = instance
+    .prepare(
+      "SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'registrations'"
+    )
+    .get();
+  if (!tableRow) {
+    instance.exec(REGISTRATIONS_DDL);
+  }
+}
+
 function initDatabase() {
   if (db) return db;
 
@@ -163,6 +188,7 @@ function initDatabase() {
   ensureUsersSchema(db);
   ensureRefreshTokenSchema(db);
   ensureEventsSchema(db);
+  ensureRegistrationsSchema(db);
 
   return db;
 }
