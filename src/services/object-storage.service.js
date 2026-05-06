@@ -62,7 +62,16 @@ async function uploadEventImage({ userId, buffer, contentType, originalName }) {
     throw err;
   }
   await ensureBucket();
-  const key = `events/${userId}/${crypto.randomUUID()}-${sanitizeFilename(originalName)}`;
+  const now = new Date();
+  const timestamp = now.getFullYear().toString() +
+    String(now.getMonth() + 1).padStart(2, '0') +
+    String(now.getDate()).padStart(2, '0') +
+    String(now.getHours()).padStart(2, '0') +
+    String(now.getMinutes()).padStart(2, '0') +
+    String(now.getSeconds()).padStart(2, '0');
+  const ext = path.extname(originalName).toLowerCase();
+  const newFilename = timestamp + ext;
+  const key = `events/${userId}/${newFilename}`;
   await s3.send(
     new PutObjectCommand({
       Bucket: getBucket(),
