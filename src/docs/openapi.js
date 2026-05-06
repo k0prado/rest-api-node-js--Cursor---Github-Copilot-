@@ -51,6 +51,11 @@ function buildOpenApiSpec() {
             description: { type: 'string' },
             address: { type: 'string' },
             date: { type: 'string', format: 'date-time' },
+            imagePath: {
+              type: 'string',
+              nullable: true,
+              description: 'Object key of the image in MinIO (when provided at creation)'
+            },
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' }
           }
@@ -206,6 +211,8 @@ function buildOpenApiSpec() {
         post: {
           tags: ['Events'],
           summary: 'Create event',
+          description:
+            'Send JSON as usual, or multipart/form-data with the same fields plus an optional image file (field name: image).',
           security: [{ cookieAuth: [] }],
           requestBody: {
             required: true,
@@ -219,6 +226,23 @@ function buildOpenApiSpec() {
                     description: { type: 'string' },
                     address: { type: 'string' },
                     date: { type: 'string', format: 'date-time' }
+                  }
+                }
+              },
+              'multipart/form-data': {
+                schema: {
+                  type: 'object',
+                  required: ['title', 'description', 'address', 'date'],
+                  properties: {
+                    title: { type: 'string' },
+                    description: { type: 'string' },
+                    address: { type: 'string' },
+                    date: { type: 'string', format: 'date-time' },
+                    image: {
+                      type: 'string',
+                      format: 'binary',
+                      description: 'Optional image (jpeg, png, gif, or webp, max 5MB)'
+                    }
                   }
                 }
               }
@@ -239,7 +263,8 @@ function buildOpenApiSpec() {
               }
             },
             400: { description: 'Validation error' },
-            401: { description: 'Unauthorized' }
+            401: { description: 'Unauthorized' },
+            503: { description: 'Object storage not configured (when an image is uploaded)' }
           }
         }
       },

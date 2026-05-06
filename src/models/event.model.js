@@ -9,7 +9,7 @@ function getEventRepository() {
 }
 
 class EventModel {
-  static create({ userId, title, description, address, date }) {
+  static create({ userId, title, description, address, date, imagePath = null }) {
     return getEventRepository().create({
       id: crypto.randomUUID(),
       userId,
@@ -17,6 +17,7 @@ class EventModel {
       description,
       address,
       date,
+      imagePath,
       createdAt: new Date().toISOString()
     });
   }

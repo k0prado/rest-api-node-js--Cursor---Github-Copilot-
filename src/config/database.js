@@ -47,6 +47,7 @@ const EVENTS_DDL = `
     evt_description TEXT NOT NULL,
     evt_address TEXT NOT NULL,
     evt_date TEXT NOT NULL,
+    evt_image_path TEXT,
     evt_created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     evt_updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (evt_user_uuid) REFERENCES users(usr_uuid) ON DELETE CASCADE
@@ -154,6 +155,17 @@ function ensureRefreshTokenSchema(instance) {
   }
 }
 
+function eventsTableHasImagePathColumn(instance) {
+  const cols = instance.prepare('PRAGMA table_info(events)').all();
+  return cols.some((c) => c.name === 'evt_image_path');
+}
+
+function migrateEventsAddImagePath(instance) {
+  if (!eventsTableHasImagePathColumn(instance)) {
+    instance.exec('ALTER TABLE events ADD COLUMN evt_image_path TEXT');
+  }
+}
+
 function ensureEventsSchema(instance) {
   const tableRow = instance
     .prepare(
@@ -162,7 +174,9 @@ function ensureEventsSchema(instance) {
     .get();
   if (!tableRow) {
     instance.exec(EVENTS_DDL);
+    return;
   }
+  migrateEventsAddImagePath(instance);
 }
 
 function ensureRegistrationsSchema(instance) {
