@@ -57,6 +57,9 @@ Main variables from `.env`:
 - `SQLITE_PATH`
 - `JWT_ACCESS_SECRET`
 - `JWT_REFRESH_SECRET`
+- `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, `MINIO_REGION` (for optional event cover images; see `.env.example`)
+
+Docker Compose starts **MinIO** alongside the API (ports `9000` API, `9001` console). The API uses `http://minio:9000` inside the stack.
 
 ## Important Database Behavior
 
@@ -77,7 +80,7 @@ The application initializes schema automatically and **resets all table data whe
 
 ### Events (requires authentication cookie)
 
-- `POST /events`
+- `POST /events` — JSON body as before, or `multipart/form-data` with fields `title`, `description`, `address`, `date` and optional file field `image` (jpeg/png/gif/webp, max 5MB). Responses include `imagePath` (object key in MinIO) when an image was stored.
 - `GET /events`
 - `GET /events/:id`
 - `PUT /events/:id`

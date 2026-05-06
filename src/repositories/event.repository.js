@@ -10,6 +10,7 @@ function rowToEvent(row) {
     address: row.evt_address,
     adress: row.evt_address,
     date: row.evt_date,
+    imagePath: row.evt_image_path || null,
     createdAt: row.evt_created_at,
     updatedAt: row.evt_updated_at
   };
@@ -26,6 +27,7 @@ class EventRepository extends BaseRepository {
         evt_description,
         evt_address,
         evt_date,
+        evt_image_path,
         evt_created_at,
         evt_updated_at
       )
@@ -36,6 +38,7 @@ class EventRepository extends BaseRepository {
         @evt_description,
         @evt_address,
         @evt_date,
+        @evt_image_path,
         @ts,
         @ts
       )
@@ -49,6 +52,7 @@ class EventRepository extends BaseRepository {
         evt_description,
         evt_address,
         evt_date,
+        evt_image_path,
         evt_created_at,
         evt_updated_at
       FROM events
@@ -63,6 +67,7 @@ class EventRepository extends BaseRepository {
         evt_description,
         evt_address,
         evt_date,
+        evt_image_path,
         evt_created_at,
         evt_updated_at
       FROM events
@@ -95,6 +100,7 @@ class EventRepository extends BaseRepository {
       evt_description: payload.description,
       evt_address: payload.address,
       evt_date: payload.date,
+      evt_image_path: payload.imagePath ?? null,
       ts: payload.createdAt
     });
     return rowToEvent(this._byUuidAndUser.get(payload.id, payload.userId));

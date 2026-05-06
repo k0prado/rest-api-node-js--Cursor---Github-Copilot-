@@ -1,5 +1,6 @@
 const EventModel = require('../models/event.model');
 const RegistrationModel = require('../models/registration.model');
+const objectStorage = require('../services/object-storage.service');
 
 function toTrimmedString(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -61,7 +62,34 @@ async function createEvent(req, res) {
     }
 
     const payload = assertValidEventInput(req.body || {});
-    const event = EventModel.create({ userId, ...payload });
+
+    let imagePath = null;
+    if (req.file) {
+      if (!objectStorage.isObjectStorageConfigured()) {
+        return res.status(503).json({ message: 'object storage is not configured' });
+      }
+      try {
+        imagePath = await objectStorage.uploadEventImage({
+          userId,
+          buffer: req.file.buffer,
+          contentType: req.file.mimetype,
+          originalName: req.file.originalname
+        });
+      } catch (uploadErr) {
+        return res.status(uploadErr.statusCode || 500).json({ message: uploadErr.message });
+      }
+    }
+
+    let event;
+    try {
+      event = EventModel.create({ userId, ...payload, imagePath });
+    } catch (createErr) {
+      if (imagePath) {
+        await objectStorage.deleteObjectByKey(imagePath).catch(() => {});
+      }
+      throw createErr;
+    }
+
     RegistrationModel.register({ userId, eventId: event.id });
     return res.status(201).json({ event });
   } catch (error) {
@@ -125,10 +153,20 @@ async function deleteEvent(req, res) {
       return res.status(401).json({ message: 'unauthorized' });
     }
 
+    const existing = EventModel.findByIdForUser(req.params.id, userId);
+    if (!existing) {
+      return res.status(404).json({ message: 'event not found' });
+    }
+
     const deleted = EventModel.deleteForUser(req.params.id, userId);
     if (!deleted) {
       return res.status(404).json({ message: 'event not found' });
     }
+
+    if (existing.imagePath) {
+      await objectStorage.deleteObjectByKey(existing.imagePath).catch(() => {});
+    }
+
     return res.status(200).json({ deleted: true });
   } catch (error) {
     return res.status(error.statusCode || 500).json({ message: error.message });
